@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 void main() {
-  runApp(const TapRushApp());
+  runApp(const MyApp());
 }
 
-class TapRushApp extends StatelessWidget {
-  const TapRushApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -25,183 +25,197 @@ class GamePage extends StatefulWidget {
   State<GamePage> createState() => _GamePageState();
 }
 
-class _GamePageState extends State<GamePage>
-    with SingleTickerProviderStateMixin {
-  final Random _random = Random();
+class _GamePageState extends State<GamePage> {
+  // ================= AUDIO =================
   final AudioPlayer _player = AudioPlayer();
+  bool _canPlaySound = true;
 
-  double circleX = 0;
-  double circleY = 0;
-  final double circleSize = 90;
+  static const double _boomVolume = 0.8;
+  static const int _soundDurationMs = 120;
+
+  // ================= GAME ==================
+  final double radius = 40;
+  Offset circleOffset = Offset.zero;
+
+  Size? safeSize;
+  EdgeInsets safePadding = EdgeInsets.zero;
 
   int score = 0;
-  bool isGameOver = false;
+  bool gameOver = false;
+  bool initialized = false;
 
-  late AnimationController _controller;
-  late Animation<double> _scaleAnim;
-
+  // ============== INIT =====================
   @override
   void initState() {
     super.initState();
 
     _player.setReleaseMode(ReleaseMode.stop);
+    _player.setVolume(_boomVolume);
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 120),
-    );
-
-    _scaleAnim = Tween(begin: 1.0, end: 0.85).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    // ✅ SAFE PLACE
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      moveCircle();
+      if (safeSize != null && !initialized) {
+        initGame(safeSize!);
+      }
     });
   }
 
-  @override
-  void dispose() {
-    _player.dispose();
-    _controller.dispose();
-    super.dispose();
+  // ============== GAME INIT ================
+  void initGame(Size fullSize) {
+    final r = Random();
+
+    final width = fullSize.width - safePadding.horizontal;
+    final height = fullSize.height - safePadding.vertical;
+
+    setState(() {
+      initialized = true;
+      gameOver = false;
+      score = 0;
+
+      circleOffset = Offset(
+        safePadding.left + r.nextDouble() * (width - radius * 2) + radius,
+        safePadding.top + r.nextDouble() * (height - radius * 2) + radius,
+      );
+    });
   }
 
-  Future<void> playBoom() async {
-    try {
-      await _player.stop();
-      await _player.play(AssetSource('sounds/boom.mp3'));
-    } catch (_) {}
-  }
-
+  // ============== MOVE CIRCLE ==============
   void moveCircle() {
-    final size = MediaQuery.of(context).size;
+    final r = Random();
+    final width = safeSize!.width - safePadding.horizontal;
+    final height = safeSize!.height - safePadding.vertical;
 
     setState(() {
-      circleX = _random.nextDouble() * (size.width - circleSize);
-      circleY = _random.nextDouble() *
-              (size.height - circleSize - 120) +
-          80;
+      circleOffset = Offset(
+        safePadding.left + r.nextDouble() * (width - radius * 2) + radius,
+        safePadding.top + r.nextDouble() * (height - radius * 2) + radius,
+      );
     });
   }
 
-  void gameOver() {
-    setState(() {
-      isGameOver = true;
+  // ============== SOUND ====================
+  void playBoom() async {
+    if (!_canPlaySound) return;
+
+    _canPlaySound = false;
+
+    await _player.stop();
+    await _player.play(AssetSource('boom.mp3'));
+
+    Future.delayed(const Duration(milliseconds: _soundDurationMs), () {
+      _player.stop();
+      _canPlaySound = true;
     });
   }
 
-  void onTapDown(TapDownDetails details) {
-    if (isGameOver) return;
+  // ============== TAP ======================
+  void handleTap(TapDownDetails details) {
+    if (!initialized || gameOver) return;
 
     final tap = details.localPosition;
-    final center = Offset(
-      circleX + circleSize / 2,
-      circleY + circleSize / 2,
-    );
+    final distance = (tap - circleOffset).distance;
 
-    if ((tap - center).distance <= circleSize / 2) {
+    if (distance <= radius) {
       playBoom();
-      _controller.forward().then((_) => _controller.reverse());
-
       setState(() => score++);
       moveCircle();
     } else {
-      gameOver();
+      setState(() => gameOver = true);
     }
   }
 
+  // ============== UI =======================
   @override
   Widget build(BuildContext context) {
+    safePadding = MediaQuery.of(context).padding;
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: onTapDown,
-        child: Stack(
-          children: [
-            Positioned(
-              top: 50,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  'Score: $score',
-                  style: const TextStyle(
-                    fontSize: 26,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            safeSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-            if (!isGameOver)
-              AnimatedBuilder(
-                animation: _scaleAnim,
-                builder: (_, __) {
-                  return Positioned(
-                    left: circleX,
-                    top: circleY,
-                    child: Transform.scale(
-                      scale: _scaleAnim.value,
-                      child: Container(
-                        width: circleSize,
-                        height: circleSize,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.orange,
-                          boxShadow: [
-                            BoxShadow(
-                              blurRadius: 12,
-                              color: Colors.black54,
-                              offset: Offset(2, 4),
-                            )
-                          ],
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: handleTap,
+              child: Stack(
+                children: [
+                  CustomPaint(
+                    size: Size.infinite,
+                    painter: CirclePainter(circleOffset, radius),
+                  ),
+
+                  Positioned(
+                    top: 12,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Text(
+                        'Score: $score',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
 
-            if (isGameOver)
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'GAME OVER',
-                      style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
+                  if (gameOver)
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'GAME OVER\nScore: $score',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: () => initGame(safeSize!),
+                            child: const Text('Restart'),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Score: $score',
-                      style:
-                          const TextStyle(color: Colors.white, fontSize: 22),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          score = 0;
-                          isGameOver = false;
-                        });
-                        moveCircle();
-                      },
-                      child: const Text('Restart'),
-                    )
-                  ],
-                ),
+                ],
               ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
+
+  // ============== CLEAN ====================
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+}
+
+// ================= PAINTER =================
+class CirclePainter extends CustomPainter {
+  final Offset offset;
+  final double radius;
+
+  CirclePainter(this.offset, this.radius);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.greenAccent
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(offset, radius, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
