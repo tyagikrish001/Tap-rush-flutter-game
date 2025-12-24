@@ -1,0 +1,17 @@
+name: tap_rush
+description: Simple tap game
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  audioplayers: ^5.2.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/sounds/boom.mp3
