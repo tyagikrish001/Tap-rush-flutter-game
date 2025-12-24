@@ -1,16 +1,21 @@
-# tap_rush
+# Tap Rush 🚀
 
-A new Flutter project.
+A fast-paced reaction tap game built with **Flutter**.  
+Test your reflexes by tapping the moving target before you miss.
 
-## Getting Started
+## 🎮 Features
+- Random moving target
+- Real-time score tracking
+- Game over & restart flow
+- Optimized tap sound (short, no overlap)
+- Smooth performance on Android
 
-This project is a starting point for a Flutter application.
+## 🛠 Tech Stack
+- Flutter
+- Dart
+- audioplayers
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ▶️ How to Run
+```bash
+flutter pub get
+flutter run
